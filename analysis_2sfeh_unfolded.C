@@ -6,6 +6,7 @@
 #include <map>
 #include <TH1F.h>
 #include <TFile.h>
+#include <TCanvas.h>
 
 using namespace std;
 
@@ -45,7 +46,7 @@ int main() {
         {"2SFEH-R-18-CYNV-465005-2-Top", {7.342, 6.739, 6.930, 7.416, 6.855, 7.076, 7.486, 6.933, 7.117, 7.347, 7.127, 6.814, 7.312, 7.307, 6.810, 7.202, 6.690, 7.560, 7.199, 7.075, 6.861, 7.317, 7.040, 6.538, 6.745, 6.730, 7.580, 7.694}},
         {"2SFEH-R-18-CYNV-465005-2-Bottom", {6.767, 7.010, 6.924, 7.575, 7.333, 7.433, 7.188, 6.932, 7.355, 6.934, 7.651, 7.233, 6.434, 6.017, 5.998, 5.928, 7.274, 7.389, 7.657, 7.573, 7.038, 7.074, 7.191, 7.272, 7.164, 7.305, 7.111, 7.226}},
         {"2SFEH-R-40-CYNT-465006-2-Top", {6.844, 7.763, 8.033, 7.843, 6.522, 6.671, 7.498, 7.591, 7.159, 6.658, 6.975, 7.342, 7.119, 6.931, 7.333, 7.262, 7.277, 7.554, 7.763, 6.894, 7.047, 6.756, 6.831, 7.280, 7.250, 6.993, 6.883, 6.746}},
-        {"2SFEH-R-40-CYNT-465006-2-Bottom", {7.138, 7.215, 7.611, 7.147, 6.795, 7.278, 7.308, 7.480, 7.485, 6.907, 7.013, 6.830, 7.335, 6.736, 7.148}},
+      
         {"2SFEH-R-40-CYNT-465006-2-Bottom", {6.434, 7.612, 7.191, 7.226, 6.698, 7.085, 7.287, 7.439, 7.206, 7.488, 7.073, 7.187, 7.353, 7.420, 6.763, 7.875, 7.378, 7.265, 6.739, 7.508, 6.664, 7.724, 7.085, 6.773, 7.150, 7.044, 6.808, 7.507}},
         {"2SFEH-L-40-CYNR-465004-2-Top", {7.110, 7.150, 7.581, 7.265, 7.046, 7.739, 7.695, 6.992, 7.548, 7.271, 7.347, 6.595, 7.281, 7.687, 7.354, 7.793, 6.515, 7.282, 7.060, 7.120, 7.493, 6.775, 7.042, 7.168, 7.386, 7.360, 7.268, 7.077}},
         {"2SFEH-L-40-CYNR-465004-2-Bottom", {7.738, 8.083, 7.339, 7.491, 6.922, 7.191, 7.153, 7.421, 7.134, 7.631, 7.078, 7.433, 7.856, 7.387, 7.119, 7.510, 7.612, 7.779, 7.083, 7.348, 7.349, 7.563, 6.730, 7.381, 7.923, 7.626, 7.540, 7.514}},
@@ -53,37 +54,63 @@ int main() {
         {"2SFEH-L-18-CXVQ-465003-1-Bottom", {6.581, 7.491, 7.434, 7.996, 7.571, 7.397, 7.588, 7.270, 7.816, 7.271, 7.208, 7.081, 7.653, 7.684, 7.428, 7.769, 7.381, 7.490, 7.382, 7.659, 7.041, 7.891, 7.588, 7.770, 8.124, 7.856, 7.798, 8.036}},
     };
 
-    // Process the data
+    // Process each hybrid's data
     for (const auto& entry : inputData) {
         processHybridData(entry.first, entry.second, hybridData, allData);
     }
 
-    // Create histograms for each hybrid and combined histogram
-    TFile* file = new TFile("2sfeh_unfolded_histograms.root", "RECREATE");
+    // Create output ROOT file
+    TFile* outFile = new TFile("output_histograms.root", "RECREATE");
 
+    // Save histograms for each hybrid
     for (const auto& entry : hybridData) {
-        string histName = entry.first;
-        TH1F* hist = new TH1F(histName.c_str(), (histName + " Histogram").c_str(), 100, 0, 20);
-        hist->GetXaxis()->SetTitle("pull-force (g)");  // Set x-axis label
-        hist->GetYaxis()->SetTitle("Number of WBs");   // Set y-axis label
-        for (double value : entry.second) {
+        const string& hybridName = entry.first;
+        const vector<double>& data = entry.second;
+
+        // Create histogram for this hybrid
+        string histName = "hist_" + hybridName;
+        TH1F* hist = new TH1F(histName.c_str(), ("Histogram for " + hybridName).c_str(), 40, 7, 15);
+
+        // Set axis labels
+        hist->GetXaxis()->SetTitle("pull-force (g)");
+        hist->GetYaxis()->SetTitle("Number of WBs");
+        for (double value : data) {
             hist->Fill(value);
         }
+
+        // Draw the histogram and save it as a PNG file
+        TCanvas* canvas = new TCanvas();
+        hist->Draw();
+        string canvasName = hybridName + ".png";
+        canvas->SaveAs(canvasName.c_str());
+
+        // Write the histogram to the output file
         hist->Write();
     }
 
-    // Create combined histogram
-    TH1F* combinedHist = new TH1F("All_Hybrids", "Combined Histogram", 100, 0, 20);
-    combinedHist->GetXaxis()->SetTitle("pull-force (g)");  // Set x-axis label
-    combinedHist->GetYaxis()->SetTitle("Number of WBs");   // Set y-axis label
+    // Create and fill a histogram for all hybrids combined
+    TH1F* combinedHist = new TH1F("combinedHist", "Combined Histogram", 40, 7, 15);
+    combinedHist->GetXaxis()->SetTitle("pull-force (g)");
+    combinedHist->GetYaxis()->SetTitle("Number of WBs");
+    
+    
+    
     for (double value : allData) {
         combinedHist->Fill(value);
     }
+
+    // Draw the combined histogram and save it as a PNG file
+    TCanvas* combinedCanvas = new TCanvas();
+    combinedHist->Draw();
+    combinedCanvas->SaveAs("combined_histogram.png");
+
+    // Write the combined histogram to the output file
     combinedHist->Write();
 
-    file->Close();
-    delete file;
+    // Close the output file
+    outFile->Close();
+
+    cout << "Histograms saved to output_histograms.root and PNG files." << endl;
 
     return 0;
 }
-
